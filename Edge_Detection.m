@@ -16,10 +16,21 @@ figure(5);clf;
 imshow(xdata1(:,:,100))
 title('Raw Image')
 
-figure(6);clf;
+figure(8);clf;
 J = wiener2(xdata1(:,:,100),[7 7]);
-imshow(J)
+%J = imadjust(J);
+B = ordfilt2(J,10,true(8));
+imshow(B)
 title('2D Wiener Noise-Removal Filter')
+
+figure(7);clf;
+J = wiener2(xdata1(:,:,100),[7 7]);
+J = imadjust(J);
+B = ordfilt2(J,14,true(8));
+imshow(B)
+title('2D Wiener Noise-Removal Filter With Contrast Enhanced')
+
+
 
 %% Binary Gradient Mask
 figure(4); clf;
@@ -37,7 +48,7 @@ se0 = strel('line',3,0);
 BWsdil = imdilate(BWs,[se90 se0]);
 figure(7);clf;
 imshow(BWsdil)
-title('Dilated Gradient Mask')
+title('Sobel Dilated Gradient Mask')
 
 %% Prewitt
 figure(8); clf;
