@@ -7,7 +7,7 @@ x = resampleDicom('06.dcm')
 figure(1); clf
 xdata1 = imrotate3(x.data(:, :, :, 5), 0, [1 0 0]);
 sliceViewer(xdata1, 'SliceDirection', 'X');
-[x,y]  = ginput(3)
+%[x,y]  = ginput(3)
 
 figure(2); clf
 sliceViewer(xdata1, 'SliceDirection', 'Y');
