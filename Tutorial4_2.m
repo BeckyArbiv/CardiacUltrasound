@@ -2,8 +2,9 @@
 
 %% Initialize and Define Variables
 clear;
-x = resampleDicom('cylinder.dcm')
-
+% x = resampleDicom('cylinder.dcm')
+file = ('/Users/beckyarbiv/Documents/BME/BME 543/06.dcm');
+x = resampleDicom(file)
 % Frame 1
 figure(1); clf
 xdata1 = imrotate3(x.data(:, :, :, 1), 0, [0 0 1]);
