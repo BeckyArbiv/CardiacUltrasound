@@ -8,6 +8,31 @@ x = resampleDicom(file)
 % Frame 1
 figure(1); clf
 xdata1 = imrotate3(x.data(:, :, :, 1), 0, [0 0 1]);
+%a = [];
+% for i = 1:length(xdata1)
+%     b = xdata1(i,:,:);
+%     b = reshape(b, [276,208]);
+%     image(b);pause(.1);clf;
+%     a =  [a; b];
+%     
+% end
+
+for k = 1:(size(xdata1,1)/5)
+    for i = 1:5
+        xdata1avg(i,:,:) = xdata1((k-1)*5+i, :, :);
+        
+    end
+    xavgslice(k,:,:) = mean(xdata1avg);
+end
+
+for k = 1:(size(xdata1,2)/5)
+    for i = 1:5
+        ydata1avg(:,i,:) = xdata1(:,(k-1)*5+i, :);
+        
+    end
+    yavgslice(:,k,:) = mean(reshape(ydata1avg, [5,299,208]));
+end
+yavgslice = reshape(yavgslice, [55,299,208]);
 s = sliceViewer(xdata1, 'SliceDirection', 'X');
 hAx = getAxesHandle(s);
 s.SliceNumber = 105;
