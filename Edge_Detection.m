@@ -3,7 +3,7 @@
 %% Initialize and Define Variables
 clear;
 file = ('/Users/beckyarbiv/Documents/BME/BME 543/06.dcm');
-x = resampleDicom(file)
+x = resampleDicom(file);
 
 xdata1 = imrotate3(x.data(:, :, :, 1), 0, [0 0 1]);
 s = sliceViewer(xdata1, 'SliceDirection', 'Y');
@@ -70,7 +70,7 @@ hold off
 
 
 J = wiener2(imgE',[7 7]);
-B = ordfilt2(J,10,true(8));
+B = ordfilt2(J,5,true(8));
 figure(2);clf;
 imshow(B)
 title('2D Wiener Noise-Removal Filter')
@@ -123,20 +123,23 @@ title('Binary Gradient Mask')
 % %% Bilated Gradient Mask
 se90 = strel('line',3,90);
 se0 = strel('line',3,0);
+
+BWsdil = imdilate(BG,[se90 se0]);
+figure(7);clf;
+imshow(BWsdil)
+title('Sobel Dilated Gradient Mask')
 % 
-% BWsdil = imdilate(BWs,[se90 se0]);
-% figure(7);clf;
-% imshow(BWsdil)
-% title('Sobel Dilated Gradient Mask')
-% 
-% %% Prewitt
-% figure(8); clf;
-% [~,threshold] = edge(filt_x,'Prewitt');
-% fudgeFactor = 1;
-% BWs = edge(filt_x,'Prewitt',threshold * fudgeFactor);
-% BWsdil = imdilate(BWs,[se90 se0]);
-% imshow(BWsdil)
-% title('Prewitt Dilated Gradient Mask')
+BWdfill = imfill(BWsdil,'holes');
+figure(9);clf;imshow(BWdfill);
+title('Binary Image with Filled Holes')
+%% Prewitt
+figure(8); clf;
+[~,threshold] = edge(filt_x,'Prewitt');
+fudgeFactor = 1;
+BWs = edge(filt_x,'Prewitt',threshold * fudgeFactor);
+BWsdil = imdilate(BWs,[se90 se0]);
+imshow(BWsdil);
+title('Prewitt Dilated Gradient Mask')
 % 
 %% Roberts
 figure(9); clf;
