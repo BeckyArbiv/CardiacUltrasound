@@ -66,7 +66,7 @@ MagLongAxis = zeros(1, X.NumVolumes);
 %% Edge tracking lets gooooo
 xdata1 = imrotate3(X.data(:, :, :, 1), 0, [1 0 0]);
 [xavgslice,yavgslice,zavgslice] = avg_slices(xdata1);
-[row, col, distance,x_input,y_input,index_x, index_y] = edge_tracking(xavgslice);
+[row, col, distance,x_input,y_input,index_x, index_y] = edge_tracking(xavgslice,yavgslice,zavgslice);
 for t = 2:X.NumVolumes
 xdata1 = imrotate3(X.data(:, :, :, t), 0, [1 0 0]);
 [xavgslice,yavgslice,zavgslice] = avg_slices(xdata1);
@@ -74,7 +74,8 @@ xdata1 = imrotate3(X.data(:, :, :, t), 0, [1 0 0]);
      
 end
 
-function [row, col, distance,x_input,y_input,index_x, index_y] = edge_tracking(xavgslice)
+function [row, col, distance,x_input,y_input,index_x, index_y] = edge_tracking(xavgslice,yavgslice,zavgslice)
+%X SLICE
 figure(7); clf
 hold on
 xslice = 33; % find optimal slice number
@@ -87,29 +88,72 @@ BG = edge(filt_x,'Roberts',threshold * fudgeFactor);
 
 se90 = strel('line',3,90);
 se0 = strel('line',3,0);
-BWsdil = imdilate(BG,[se90 se0]);
+BWsdilX = imdilate(BG,[se90 se0]);
 
-imagesc(BWsdil)
+imagesc(BWsdilX)
 xlabel('z')
 ylabel('y')
-click = ginput(1)
-x_input = round(click(1));
-y_input = round(click(2));
-plot(x_input, y_input,'or')
+click = ginput(3)
+x_input = round(click(:,1));
+y_input = round(click(:,2));
+plot(x_input, y_input,'or','MarkerSize',7, 'MarkerFaceColor', 'r')
+hold off
+%Y SLICE
+figure(8); clf
+hold on
+yslice = 30; % find optimal slice number
+J = wiener2(squeeze(yavgslice(yslice,:,:)),[7 7]);
+B = ordfilt2(J,10,true(8));
+filt_x = imgaussfilt(B, 1);
+[~,threshold] = edge(filt_x,'Roberts');
+fudgeFactor = 0.2;
+BG = edge(filt_x,'Roberts',threshold * fudgeFactor);
+BWsdilY = imdilate(BG,[se90 se0]);
+imagesc(BWsdilY)
+xlabel('z')
+ylabel('x')
+click_y = ginput(3)
+x_input_y = round(click_y(:,1));
+y_input_y = round(click_y(:,2));
+plot(x_input_y, y_input_y,'or','MarkerSize',7, 'MarkerFaceColor', 'r')
+hold off
+%Z SLICE
+figure(9); clf
+hold on
+zslice = 30; % find optimal slice number
+J = wiener2(squeeze(zavgslice(zslice,:,:)),[7 7]);
+B = ordfilt2(J,10,true(8));
+filt_x = imgaussfilt(B, 1);
+[~,threshold] = edge(filt_x,'Roberts');
+fudgeFactor = 0.2;
+BG = edge(filt_x,'Roberts',threshold * fudgeFactor);
+BWsdilZ = imdilate(BG,[se90 se0]);
+imagesc(BWsdilZ)
+xlabel('x')
+ylabel('y')
+click_z = ginput(1)
+x_input_z = round(click_z(:,1));
+y_input_z = round(click_z(:,2));
+plot(x_input_z, y_input_z,'or','MarkerSize',7, 'MarkerFaceColor', 'r')
+hold off
+
 % define ROI
 roiSize = 5;
 roiEdge = (roiSize-1)/2;
 roiCent = roiEdge+1;
-dim=size(BWsdil,1);
-roi = int8(BWsdil([y_input-roiEdge:y_input+roiEdge],[x_input-roiEdge:x_input+roiEdge]));
-xkernal = [click(1)-1 click(1)+1 click(1)+1 click(1)-1 click(1)+1 click(1) click(1) click(1)+1 click(1)-1];
-ykernal = [click(2)-1 click(2)-1 click(2)+1 click(2)+1 click(2)-1 click(2)+1 click(2)-1 click(2) click(2)];
-plot([x_input-roiEdge:x_input+roiEdge],[y_input-roiEdge:y_input+roiEdge],'*')
-hold off
+dim=size(BWsdilX,1);
+roi = zeros(roiSize,roiSize,length(click));
+for i = 1:length(click)
+roi(:,:,i) = int8(BWsdilX([y_input(i)-roiEdge:y_input(i)+roiEdge],[x_input(i)-roiEdge:x_input(i)+roiEdge]));
+end
 
-if all(roi == 1)
+% figure(7)
+% plot([x_input-roiEdge:x_input+roiEdge],[y_input-roiEdge:y_input+roiEdge],'*')
+
+
+if any(all(all(roi == 1)))
     error("Please select an edge")
-elseif all(roi == 0)
+elseif any(all(all(roi == 0)))
     error("Please select an edge")
 end
 
@@ -130,7 +174,7 @@ end
 index_y = y_input + (-row+roiCent);
 index_x = y_input + (col-roiCent);
 end
-%% Average Slices
+% Average Slices
 function [xavgslice,yavgslice,zavgslice] = avg_slices(xdata1)
 avgslice = 5;
 
