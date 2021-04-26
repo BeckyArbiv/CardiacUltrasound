@@ -4,20 +4,20 @@
 clear;
 close all
 %x = resampleDicom('06.dcm')
-file = ('/Users/beckyarbiv/Documents/BME/BME 543/06.dcm');
+file = ('/Users/beckyarbiv/Documents/BME/BME 543/07.dcm');
 X = resampleDicom(file);
-MagLongAxis = zeros(1, X.NumVolumes);
-% % % for t = 1:X.NumVolumes
-% % % % figure(1); clf
- %xdata1 = imrotate3(X.data(:, :, :, 1), 0, [1 0 0]);
-% % % % sliceViewer(xdata1, 'SliceDirection', 'X');
-% % % % 
-% % % % figure(2); clf
-% % % % sliceViewer(xdata1, 'SliceDirection', 'Y');
-% % % % 
-% % % % figure(3); clf
-% % % % sliceViewer(xdata1, 'SliceDirection', 'Z');
-% % % 
+% MagLongAxis = zeros(1, X.NumVolumes);
+% % % % for t = 1:X.NumVolumes
+% figure(1); clf
+%  xdata1 = imrotate3(X.data(:, :, :, 1), 0, [1 0 0]);
+% sliceViewer(xdata1, 'SliceDirection', 'X');
+% 
+% figure(2); clf
+% sliceViewer(xdata1, 'SliceDirection', 'Y');
+% 
+% figure(3); clf
+% sliceViewer(xdata1, 'SliceDirection', 'Z');
+
 
 % figure(4); clf
 
@@ -64,22 +64,46 @@ MagLongAxis = zeros(1, X.NumVolumes);
 %     end
 % 10 for z for dataset 6
 %% Edge tracking lets gooooo
+Xslice_num = floor(0.55*size(xdata1,1)/5);
+Yslice_num = 26;
+Zslice_num = 10;
+avgslice = 5;
 xdata1 = imrotate3(X.data(:, :, :, 1), 0, [1 0 0]);
 [xavgslice,yavgslice,zavgslice] = avg_slices(xdata1);
-[row, col, distance,x_input,y_input,index_x, index_y] = edge_tracking(xavgslice,yavgslice,zavgslice);
+[row, col, distance,z_input,y_input,index_x, index_y] = edge_tracking(xavgslice, Xslice_num); %X SLICE
+[Yrow, Ycol, Ydistance,Yz_input,Yx_input,Yindex_x, Yindex_y] = edge_tracking(yavgslice,Yslice_num); %Y SLICE
+[Zx_input,Zy_input] = short_axis(zavgslice,Zslice_num);
+
+%Long axis
+A = [(Zx_input(1)+Yx_input(1))/2 (y_input(1) + Zy_input(1))/2 (z_input(1) + Yz_input(1))/2];
+AC = [Xslice_num*avgslice y_input(2) z_input(2)];
+PC = [Xslice_num*avgslice y_input(3) z_input(3)];
+AA = [Yx_input(2) Yslice_num*avgslice Yz_input(2)];
+PA = [Yx_input(3) Yslice_num*avgslice Yz_input(3)];
+
+APC = PC-A;
+AAC = AC-A;
+APA = PA-A;
+AAA = AA-A;
+
+LongAxis = (APC + AAC + APA + AAA)/4
+MagLongAxis(1) = norm(LongAxis);
+Longaxis = [];
+Magnitude = [];
 for t = 2:X.NumVolumes
 xdata1 = imrotate3(X.data(:, :, :, t), 0, [1 0 0]);
 [xavgslice,yavgslice,zavgslice] = avg_slices(xdata1);
-[index_x, index_y] = track_over_frames(xavgslice,x_input,y_input,index_x, index_y,t)
-     
+[index_x, index_y] = track_over_frames(xavgslice,index_x, index_y,t) %X SLICE
+[Yindex_x, Yindex_y] = track_over_frames(yavgslice,Yindex_x, Yindex_y,t) %Y SLICE
+[longaxis, magnitude] = longaxis_calc(Zx_input, Zy_input, Yz_input, Yx_input, z_input, y_input, index_y, index_x, Yindex_x, Yindex_y, t)
+Longaxis = [Longaxis, longaxis];
+Magnitude = [Magnitude, magnitude];
 end
-
-function [row, col, distance,x_input,y_input,index_x, index_y] = edge_tracking(xavgslice,yavgslice,zavgslice)
-%X SLICE
+function [x_input,y_input] = short_axis(zavgslice,slice_num)
 figure(7); clf
 hold on
-xslice = 33; % find optimal slice number
-J = wiener2(squeeze(xavgslice(xslice,:,:)),[7 7]);
+ % find optimal slice number
+J = wiener2(squeeze(zavgslice(slice_num,:,:)),[7 7]);
 B = ordfilt2(J,10,true(8));
 filt_x = imgaussfilt(B, 1);
 [~,threshold] = edge(filt_x,'Roberts');
@@ -91,51 +115,39 @@ se0 = strel('line',3,0);
 BWsdilX = imdilate(BG,[se90 se0]);
 
 imagesc(BWsdilX)
-xlabel('z')
+xlabel('x')
 ylabel('y')
+click = ginput(1)
+x_input = round(click(:,1));
+y_input = round(click(:,2));
+plot(x_input, y_input,'or','MarkerSize',7, 'MarkerFaceColor', 'r')
+hold off
+end
+function [row, col, distance,x_input,y_input,index_x, index_y] = edge_tracking(xavgslice,slice_num)
+%X SLICE
+figure(7); clf
+hold on
+ % find optimal slice number
+J = wiener2(squeeze(xavgslice(slice_num,:,:)),[7 7]);
+B = ordfilt2(J,10,true(8));
+filt_x = imgaussfilt(B, 1);
+[~,threshold] = edge(filt_x,'Roberts');
+fudgeFactor = 0.2;
+BG = edge(filt_x,'Roberts',threshold * fudgeFactor);
+
+se90 = strel('line',3,90);
+se0 = strel('line',3,0);
+BWsdilX = imdilate(BG,[se90 se0]);
+
+imagesc(BWsdilX)
+% xlabel('z')
+% ylabel('y')
 click = ginput(3)
 x_input = round(click(:,1));
 y_input = round(click(:,2));
 plot(x_input, y_input,'or','MarkerSize',7, 'MarkerFaceColor', 'r')
 hold off
-%Y SLICE
-figure(8); clf
-hold on
-yslice = 30; % find optimal slice number
-J = wiener2(squeeze(yavgslice(yslice,:,:)),[7 7]);
-B = ordfilt2(J,10,true(8));
-filt_x = imgaussfilt(B, 1);
-[~,threshold] = edge(filt_x,'Roberts');
-fudgeFactor = 0.2;
-BG = edge(filt_x,'Roberts',threshold * fudgeFactor);
-BWsdilY = imdilate(BG,[se90 se0]);
-imagesc(BWsdilY)
-xlabel('z')
-ylabel('x')
-click_y = ginput(3)
-x_input_y = round(click_y(:,1));
-y_input_y = round(click_y(:,2));
-plot(x_input_y, y_input_y,'or','MarkerSize',7, 'MarkerFaceColor', 'r')
-hold off
-%Z SLICE
-figure(9); clf
-hold on
-zslice = 30; % find optimal slice number
-J = wiener2(squeeze(zavgslice(zslice,:,:)),[7 7]);
-B = ordfilt2(J,10,true(8));
-filt_x = imgaussfilt(B, 1);
-[~,threshold] = edge(filt_x,'Roberts');
-fudgeFactor = 0.2;
-BG = edge(filt_x,'Roberts',threshold * fudgeFactor);
-BWsdilZ = imdilate(BG,[se90 se0]);
-imagesc(BWsdilZ)
-xlabel('x')
-ylabel('y')
-click_z = ginput(1)
-x_input_z = round(click_z(:,1));
-y_input_z = round(click_z(:,2));
-plot(x_input_z, y_input_z,'or','MarkerSize',7, 'MarkerFaceColor', 'r')
-hold off
+
 
 % define ROI
 roiSize = 5;
@@ -144,7 +156,7 @@ roiCent = roiEdge+1;
 dim=size(BWsdilX,1);
 roi = zeros(roiSize,roiSize,length(click));
 for i = 1:length(click)
-roi(:,:,i) = int8(BWsdilX([y_input(i)-roiEdge:y_input(i)+roiEdge],[x_input(i)-roiEdge:x_input(i)+roiEdge]));
+roi(:,:,i) = flip(int8(BWsdilX([y_input(i)-roiEdge:y_input(i)+roiEdge],[x_input(i)-roiEdge:x_input(i)+roiEdge])));
 end
 
 % figure(7)
@@ -156,23 +168,26 @@ if any(all(all(roi == 1)))
 elseif any(all(all(roi == 0)))
     error("Please select an edge")
 end
-
-for p = 1:roiEdge
-    if any(roi(roiCent, roiCent) ~= BWsdil([y_input-p:y_input+p],[x_input-p:x_input+p]),'all')
-        [edge_row, edge_col] = find((roi(roiCent, roiCent) ~= BWsdil([y_input-p:y_input+p],[x_input-p:x_input+p])))
-        if p == 1
-            roiCent = 2;
+row = zeros(1,3);
+col = zeros(1,3);
+for q = 1:3
+    for p = 1:roiEdge
+        if any(roi(roiCent, roiCent,q) ~= BWsdilX([y_input(q)-p:y_input(q)+p],[x_input(q)-p:x_input(q)+p]),'all')
+            [edge_row, edge_col] = find((roi(roiCent, roiCent,q) ~= BWsdilX([y_input(q)-p:y_input(q)+p],[x_input(q)-p:x_input(q)+p])))
+            if p == 1
+                roiCent = 2;
+            end
+            distance = sqrt( (edge_row-roiCent).^2 + (edge_col-roiCent).^2 );
+            closest_point = find(distance== min(distance))
+            row(q) = edge_row(closest_point(1));
+            col(q) = edge_col(closest_point(1));
+            break
+            %elseif any(roi(roiCent, roiCent) == BWsdil([y_input-p:y_input+p],[x_input-p:x_input+p]),'all')
         end
-        distance = sqrt( (edge_row-roiCent).^2 + (edge_col-roiCent).^2 );
-        closest_point = find(distance== min(distance))
-        row = edge_row(closest_point);
-        col = edge_col(closest_point);
-        break
-    %elseif any(roi(roiCent, roiCent) == BWsdil([y_input-p:y_input+p],[x_input-p:x_input+p]),'all')
     end
 end
-index_y = y_input + (-row+roiCent);
-index_x = y_input + (col-roiCent);
+index_y = y_input' + (-row+roiCent);
+index_x = x_input' + (col-roiCent);
 end
 % Average Slices
 function [xavgslice,yavgslice,zavgslice] = avg_slices(xdata1)
@@ -205,7 +220,7 @@ for k = 1:(size(xdata1z,1)/avgslice)
 end
 end
 
-function [rumba_x, rumba_y] = track_over_frames(xavgslice,x_input,y_input,index_x, index_y,g)
+function [rumba_x, rumba_y] = track_over_frames(xavgslice,index_x, index_y,g)
 figure(g); clf
 hold on
 xslice = 33; % find optimal slice number
@@ -218,43 +233,81 @@ BG = edge(filt_x,'Roberts',threshold * fudgeFactor);
 
 se90 = strel('line',3,90);
 se0 = strel('line',3,0);
-BWsdil = imdilate(BG,[se90 se0]);
+BWsdilX = imdilate(BG,[se90 se0]);
 
-imagesc(BWsdil)
+imagesc(BWsdilX)
 xlabel('z')
 ylabel('y')
 
-plot(x_input,y_input,'g*')
+
 
 
 roiSize = 3;
 roiEdge = (roiSize-1)/2;
 roiCent = roiEdge+1;
 
-roi = flip(int8(BWsdil([y_input-roiEdge:y_input+roiEdge],[x_input-roiEdge:x_input+roiEdge])),1);
+roi = zeros(roiSize,roiSize,length(index_x));
+for i = 1:length(index_x)
+    roi(:,:,i) = flip(int8(BWsdilX([index_y(i)-roiEdge:index_y(i)+roiEdge],[index_x(i)-roiEdge:index_x(i)+roiEdge])));
+end
+y_input = index_y;
+x_input = index_x;
+
 rumba = 0;
-plot([x_input-roiEdge:x_input+roiEdge],[y_input-roiEdge:y_input+roiEdge],'*')
-hold off
-while rumba == 0
-    if  any(roi(roiCent, roiCent) ~= BWsdil([y_input-roiEdge:y_input+roiEdge],[x_input-roiEdge:x_input+roiEdge]),'all')
-        [edge_row, edge_col] = find((roi(roiCent, roiCent) ~= BWsdil([y_input-roiEdge:y_input+roiEdge],[x_input-roiEdge:x_input+roiEdge])))
-        distance = sqrt( (edge_row-roiCent).^2 + (edge_col-roiCent).^2 );
-        closest_point = find(distance== min(distance))
-        row = edge_row(closest_point);
-        col = edge_col(closest_point);
-        rumba = 1;
-    else
-        roiSize = roiSize + 2;
-        roiEdge = (roiSize-1)/2;
-        roiCent = roiEdge+1;
-        roi = int8(BWsdil([y_input-roiEdge:y_input+roiEdge],[x_input-roiEdge:x_input+roiEdge]));
+row = zeros(1,3);
+col = zeros(1,3);
+%plot([x_input-roiEdge:x_input+roiEdge],[y_input-roiEdge:y_input+roiEdge],'*')
+for q = 2:3
+    rumba = 0;
+    while rumba == 0
+        if any(roi(:,:,q) ~= roi(roiCent, roiCent,q),'all')
+        %if  any(roi(roiCent, roiCent,q) ~= BWsdilX([y_input(q)-roiEdge:y_input(q)+roiEdge],[x_input(q)-roiEdge:x_input(q)+roiEdge]),'all')
+            %[edge_row, edge_col] = find((roi(roiCent, roiCent,q) ~= BWsdilX([y_input(q)-roiEdge:y_input(q)+roiEdge],[x_input(q)-roiEdge:x_input(q)+roiEdge])))
+            [edge_row, edge_col] = find((roi(roiCent, roiCent,q) ~= roi(:,:,q)))
+            distance = sqrt( (edge_row-roiCent).^2 + (edge_col-roiCent).^2 );
+            closest_point = find(distance== min(distance))
+            row(q) = edge_row(closest_point(1));
+            col(q) = edge_col(closest_point(1));
+            rumba = 1;
+        else
+            roiSize = roiSize + 2;
+            roiEdge = (roiSize-1)/2;
+            roiCent = roiEdge+1;
+            roi = zeros(roiSize,roiSize,length(index_x));
+            roi(:,:,q) = flip(int8(BWsdilX([y_input(q)-roiEdge:y_input(q)+roiEdge],[x_input(q)-roiEdge:x_input(q)+roiEdge])));
+        end
     end
 end
 
-rumba_y = y_input + (-row+roiCent);
-rumba_x = x_input + (col-roiCent);
+rumba_y = y_input + (-row+roiCent)
+rumba_x = x_input + (col-roiCent)
+rumba_y(1) = y_input(1);
+rumba_x(1) = x_input(1);
+plot(rumba_x,rumba_y,'g*')
+plot(x_input, y_input, 'r*')
+hold off
 end
-%%
+
+function [LongAxis, MagLongAxis] = longaxis_calc(Zx_input, Zy_input, Yz_input, Yx_input, z_input, y_input, index_y, index_x, Yindex_x, Yindex_y, t)
+Xslice_num = 33;
+Yslice_num = 30;
+Zslice_num = 10;
+avgslice = 5;
+A = [(Zx_input(1)+Yx_input(1))/2 (y_input(1) + Zy_input(1))/2 (z_input(1) + Yz_input(1))/2]';
+AC = [Xslice_num*avgslice index_y(2) index_x(2)];
+PC = [Xslice_num*avgslice index_y(3) index_x(3)];
+AA = [Yindex_y(2) Yslice_num*avgslice Yindex_x(2)];
+PA = [Yindex_y(3) Yslice_num*avgslice Yindex_x(3)];
+
+APC = PC-A;
+AAC = AC-A;
+APA = PA-A;
+AAA = AA-A;
+
+LongAxis = (APC + AAC + APA + AAA)/4
+MagLongAxis = norm(LongAxis)
+
+end
 % % figure(7); clf
 % % xslice = 33; % find optimal slice number
 % % J = wiener2(squeeze(xavgslice(xslice,:,:)),[7 7]);
